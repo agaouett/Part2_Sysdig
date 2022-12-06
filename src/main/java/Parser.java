@@ -130,9 +130,9 @@ public class Parser {
         while (frontier.size() > 0) {
             TimedEdge edge = frontier.remove();
 
-            int maxEndtime = 0;
+            Time maxEndtime = new Time(0);
             for (TimedEdge incomingEdge: graph.edgesOf(edge.source())) {
-                maxEndtime = Math.max(incomingEdge.endTime, maxEndtime);
+                maxEndtime = Time.max(incomingEdge.endTime, maxEndtime);
             }
 
             // look at the source incoming edges, to see if we can traverse through them
@@ -141,7 +141,7 @@ public class Parser {
                     continue;
                 }
 
-                if (incomingEdge.startTime < edge.endTime && incomingEdge.startTime < maxEndtime) {
+                if (incomingEdge.startTime.less(edge.endTime) && incomingEdge.startTime.less(maxEndtime)) {
                     output.addVertex(incomingEdge.source());
                     output.addVertex(incomingEdge.target());
                     output.addEdge(incomingEdge.source(), incomingEdge.target(), new TimedEdge(incomingEdge));
@@ -191,13 +191,13 @@ public class Parser {
         test.addVertex("httpd");
 
         TimedEdge pointOfInterest = test.addEdge("wget", "malware");
-        pointOfInterest.startTime = 36;
-        pointOfInterest.endTime = 37;
+        pointOfInterest.startTime = new Time(36);
+        pointOfInterest.endTime = new Time(37);
 
-        test.addEdge("wget", "files 1", new TimedEdge(50, 52));
-        test.addEdge("bash", "wget", new TimedEdge(28, 32));
-        test.addEdge("files 2", "bash", new TimedEdge(40, 42));
-        test.addEdge("httpd", "bash", new TimedEdge(2, 8));
+        test.addEdge("wget", "files 1", new TimedEdge(new Time(50), new Time(52)));
+        test.addEdge("bash", "wget", new TimedEdge(new Time(28), new Time(32)));
+        test.addEdge("files 2", "bash", new TimedEdge(new Time(40), new Time(42)));
+        test.addEdge("httpd", "bash", new TimedEdge(new Time(2), new Time(8)));
 
         outputBacktrackedGraph(backtrack(test, pointOfInterest));
 
@@ -234,15 +234,48 @@ class LabeledEdge extends DefaultEdge {
     }
 }
 
+class Time {
+    public long seconds = 0;
+    public long nanoseconds = 0;
+
+    public Time(long seconds) {
+        this.seconds = seconds;
+        this.nanoseconds = 0;
+    }
+
+    public Time(long seconds, long nanoseconds) {
+        this.seconds = seconds;
+        this.nanoseconds = nanoseconds;
+    }
+
+    public boolean less(Time other) {
+        if (this.seconds < other.seconds) {
+            return true;
+        } else if (this.seconds == other.seconds) {
+            return this.nanoseconds < other.nanoseconds;
+        } else {
+            return false;
+        }
+    }
+
+    public static Time max(Time a, Time b) {
+        if (a.less(b)) {
+            return b;
+        } else {
+            return a;
+        }
+    }
+}
+
 class TimedEdge extends DefaultEdge {
-    public int startTime = 0;
-    public int endTime = 0;
+    public Time startTime;
+    public Time endTime;
 
     public TimedEdge() {
 
     }
 
-    public TimedEdge(int startTime, int endTime) {
+    public TimedEdge(Time startTime, Time endTime) {
         this.startTime = startTime;
         this.endTime = endTime;
     }
