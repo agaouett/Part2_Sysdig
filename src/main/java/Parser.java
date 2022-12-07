@@ -223,7 +223,7 @@ public class Parser {
     }
 
     public static void main(String[] args) {
-        String command = args[0];
+        String command = args.length > 0 ? args[0] : "";
 
         switch (command) {
             case "problem-1": {
