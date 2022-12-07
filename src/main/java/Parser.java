@@ -223,68 +223,141 @@ public class Parser {
     }
 
     public static void main(String[] args) {
-        ArrayList<SysdigEvent> tuples = parseTuples(args[0]);
+        String command = args[0];
 
-        ArrayList<Long> indices = new ArrayList<>();
-        for (SysdigEvent event: tuples) {
-            indices.add(event.index);
-        }
+        switch (command) {
+            case "problem-1": {
+                if (args.length < 2) {
+                    System.out.println("Please specify a sysdig log file.");
+                } else {
+                    // print tuples
+                    ArrayList<SysdigEvent> tuples = parseTuples(args[1]);
+                    for (SysdigEvent event : tuples) {
+                        System.out.println("<" + event.process + ", " + event.operation + ", " + event.fileDescriptor + ">");
+                    }
 
-        Time startTime = tuples.get(0).startTime;
-        Pair<DirectedMultigraph<String, TimedEdge>, HashMap<Long, TimedEdge>> result = createGraph(tuples);
-        DirectedMultigraph<String, TimedEdge> fullGraph = result.getValue0();
+                    System.out.println("\nFinished printing tuples.\n\n");
+                }
 
-        HashMap<Long, TimedEdge> indicesToEdge = result.getValue1();
-        TimedEdge pointOfInterest = indicesToEdge.get(Long.valueOf(17858));
+                break;
+            }
 
-        // {
-        //     DirectedMultigraph<String, TimedEdge> test = new DirectedMultigraph(TimedEdge.class);
-        //     test.addVertex("malware");
-        //     test.addVertex("wget");
-        //     test.addVertex("files 1");
-        //     test.addVertex("files 2");
-        //     test.addVertex("bash");
-        //     test.addVertex("httpd");
+            case "problem-2": {
+                if (args.length < 2) {
+                    System.out.println("Please specify a sysdig log file.");
+                } else {
+                    // create the graph
+                    ArrayList<SysdigEvent> tuples = parseTuples(args[1]);
+                    Time startTime = tuples.get(0).startTime;
+                    Pair<DirectedMultigraph<String, TimedEdge>, HashMap<Long, TimedEdge>> result = createGraph(tuples);
+                    DirectedMultigraph<String, TimedEdge> fullGraph = result.getValue0();
 
-        //     TimedEdge testPointOfInterest = test.addEdge("wget", "malware");
-        //     testPointOfInterest.startTime = new Time(36);
-        //     testPointOfInterest.endTime = new Time(37);
+                    outputGraph(fullGraph, startTime);
 
-        //     test.addEdge("wget", "files 1", new TimedEdge(1, new Time(50), new Time(52)));
-        //     test.addEdge("bash", "wget", new TimedEdge(2, new Time(28), new Time(32)));
-        //     test.addEdge("files 2", "bash", new TimedEdge(3, new Time(40), new Time(42)));
-        //     test.addEdge("httpd", "bash", new TimedEdge(4, new Time(2), new Time(8)));
+                    System.out.println("Created `./graph-output.dot.`");
+                }
 
-        //     outputBacktrackedGraph(backtrack(test, testPointOfInterest), new Time(0));
-        // }
+                break;
+            }
 
-        int biggestSize = 0;
-        long biggestIndex = 0;
-        for (long index: indices) {
-            var size = backtrack(fullGraph, indicesToEdge.get(index)).vertexSet().size();
-            if (size > biggestSize) {
-                biggestIndex = index;
-                biggestSize = size;
+            case "problem-3": {
+                if (args.length < 2 || (!args[1].equals("poi") && !args[1].equals("biggest") && !args[1].equals("demo"))) {
+                    System.out.println("Please specify a subcommand:");
+                    System.out.println("     poi [log file] [edge]    creates a graph, backtracking from the P.O.I. edge");
+                    System.out.println("     biggest [log file]       finds the biggest backtracked sub-graph out of the base sysdig graph");
+                    System.out.println("     demo                     creates a graph based on backtracking example in L13 lecture slides");
+                    return;
+                } else if ((args[1].equals("poi") || args[1].equals("biggest")) && args.length < 3) {
+                    System.out.println("Please specify a sysdig log file.");
+                    return;
+                } else if (args[1].equals("poi") && args.length < 4) {
+                    System.out.println("Please specify an edge index.");
+                    return;
+                } else if (args[1].equals("demo")) {
+                    // create the demo graph
+                    DirectedMultigraph<String, TimedEdge> test = new DirectedMultigraph(TimedEdge.class);
+                    test.addVertex("malware");
+                    test.addVertex("wget");
+                    test.addVertex("files 1");
+                    test.addVertex("files 2");
+                    test.addVertex("bash");
+                    test.addVertex("httpd");
+
+                    // add edges to demo graph
+                    TimedEdge testPointOfInterest = test.addEdge("wget", "malware");
+                    testPointOfInterest.startTime = new Time(36);
+                    testPointOfInterest.endTime = new Time(37);
+
+                    test.addEdge("wget", "files 1", new TimedEdge(1, new Time(50), new Time(52)));
+                    test.addEdge("bash", "wget", new TimedEdge(2, new Time(28), new Time(32)));
+                    test.addEdge("files 2", "bash", new TimedEdge(3, new Time(40), new Time(42)));
+                    test.addEdge("httpd", "bash", new TimedEdge(4, new Time(2), new Time(8)));
+
+                    // compute backtrack, and save to file
+                    outputBacktrackedGraph(backtrack(test, testPointOfInterest), new Time(0));
+                    System.out.println("Created `./backtrack-graph-output.dot.`");
+                    return;
+                }
+
+                // create the graph
+                ArrayList<SysdigEvent> tuples = parseTuples(args[2]);
+
+                ArrayList<Long> indices = new ArrayList<>();
+                for (SysdigEvent event: tuples) { // keep track of edge indices
+                    indices.add(event.index);
+                }
+
+                Time startTime = tuples.get(0).startTime;
+                Pair<DirectedMultigraph<String, TimedEdge>, HashMap<Long, TimedEdge>> result = createGraph(tuples);
+                DirectedMultigraph<String, TimedEdge> fullGraph = result.getValue0();
+                HashMap<Long, TimedEdge> indicesToEdge = result.getValue1();
+
+                // select point of interest based on subcommand
+                long pointOfInterestIndex = 0;
+                switch (args[1]) {
+                    case "poi": {
+                        pointOfInterestIndex = Long.valueOf(args[3]);
+                        break;
+                    }
+
+                    case "biggest": {
+                        int biggestSize = 0;
+                        for (long index: indices) {
+                            var size = backtrack(fullGraph, indicesToEdge.get(index)).vertexSet().size();
+                            if (size > biggestSize) {
+                                pointOfInterestIndex = index;
+                                biggestSize = size;
+                            }
+                        }
+
+                        break;
+                    }
+
+                    default: {
+                        return;
+                    }
+                }
+
+                // backtrack using point of interest
+                TimedEdge pointOfInterest = indicesToEdge.get(Long.valueOf(pointOfInterestIndex));
+                if (pointOfInterest != null) {
+                    outputBacktrackedGraph(backtrack(fullGraph, pointOfInterest), startTime);
+                    System.out.println("Created `./backtrack-graph-output.dot`.");
+                } else {
+                    System.out.println("Point of interest was not found.");
+                }
+
+                break;
+            }
+
+            // print help if they didn't choose a correct command
+            default: {
+                System.out.println("Please specify a command:");
+                System.out.println("     problem-1 [log file]      demos problem 1, prints tuples to stdout");
+                System.out.println("     problem-2 [log file]      demos problem 2, saves graph to file");
+                System.out.println("     problem-3 [subcommand]    demos problem 3, saves a backtracked graph to file");
             }
         }
-
-        // pointOfInterest = indicesToEdge.get(Long.valueOf(biggestIndex));
-
-        if (pointOfInterest != null) {
-            outputBacktrackedGraph(backtrack(fullGraph, pointOfInterest), startTime);
-        } else {
-            System.out.println("point of interest was not found");
-        }
-
-        /*
-        // Demo for Question 1
-        for (Triplet<String, String, String> tuple : tuples) {
-            System.out.println(tuple);
-        }
-        */
-
-        // Demo for Question 2
-        outputGraph(fullGraph, startTime);
     }
 }
 
